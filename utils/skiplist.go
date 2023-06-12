@@ -22,8 +22,14 @@ type SkipList struct {
 }
 
 func NewSkipList() *SkipList {
-	//implement me here!!!
-	return nil
+	headers := &Element{
+		levels: make([]*Element, defaultMaxLevel),
+	}
+	return &SkipList{
+		header:   headers,
+		maxLevel: defaultMaxLevel - 1,
+		rand:     r,
+	}
 }
 
 type Element struct {
@@ -81,7 +87,7 @@ func (list *SkipList) compare(score float64, key []byte, next *Element) int {
 }
 
 func (list *SkipList) randLevel() int {
-	//implement me here!!!
+
 	return 0
 }
 
