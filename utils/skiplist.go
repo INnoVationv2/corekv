@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"github.com/hardcore-os/corekv/utils/codec"
 	"math/rand"
 	"sync"
@@ -11,10 +12,8 @@ const (
 )
 
 type SkipList struct {
-	header *Element
-
-	rand *rand.Rand
-
+	header   *Element
+	rand     *rand.Rand
 	maxLevel int
 	length   int
 	lock     sync.RWMutex
@@ -51,12 +50,67 @@ func (elem *Element) Entry() *codec.Entry {
 }
 
 func (list *SkipList) Add(data *codec.Entry) error {
-	//implement me here!!!
+	list.lock.Lock()
+	defer list.lock.Unlock()
+
+	key := data.Key
+	score := list.calcScore(data.Key)
+	prevElem := list.header
+	prevElements := make([]*Element, defaultMaxLevel)
+
+	for level := defaultMaxLevel - 1; level >= 0; level-- {
+		for next := prevElem.levels[level]; next != nil; next = prevElem.levels[level] {
+			if compare := list.compare(score, key, next); compare <= 0 {
+				if compare == 0 {
+					next.entry = data
+					return nil
+				} else {
+					prevElem = next
+				}
+			} else {
+				break
+			}
+		}
+		prevElements[level] = prevElem
+	}
+
+	level := list.randLevel()
+	element := newElement(score, data, level)
+	for i := 0; i < level; i++ {
+		element.levels[i] = prevElements[i].levels[i]
+		prevElements[i].levels[i] = element
+	}
+
+	list.length++
+	list.size = list.size + int64(level)
+
 	return nil
 }
 
 func (list *SkipList) Search(key []byte) (e *codec.Entry) {
-	//implement me here!!!
+	list.lock.RLock()
+	defer list.lock.RUnlock()
+
+	if list.length == 0 {
+		return nil
+	}
+
+	score := list.calcScore(key)
+	prev, level := list.header, defaultMaxLevel-1
+
+	for ; level >= 0; level-- {
+		for next := prev.levels[level]; next != nil; next = prev.levels[level] {
+			if compare := list.compare(score, key, next); compare <= 0 {
+				if compare == 0 {
+					return next.entry
+				} else {
+					prev = next
+				}
+			} else {
+				break
+			}
+		}
+	}
 	return nil
 }
 
@@ -82,16 +136,26 @@ func (list *SkipList) calcScore(key []byte) (score float64) {
 }
 
 func (list *SkipList) compare(score float64, key []byte, next *Element) int {
-	//implement me here!!!
-	return 0
+	if score == next.score {
+		return bytes.Compare(key, next.entry.Key)
+	}
+
+	if score < next.score {
+		return -1
+	} else {
+		return 1
+	}
 }
 
 func (list *SkipList) randLevel() int {
-
-	return 0
+	for level := 1; level < defaultMaxLevel; level++ {
+		if list.rand.Intn(2) == 0 {
+			return level
+		}
+	}
+	return defaultMaxLevel
 }
 
 func (list *SkipList) Size() int64 {
-	//implement me here!!!
-	return 0
+	return list.size
 }
